@@ -79,7 +79,7 @@ term.on('key', (name, matches, data) => {
 term.clear();
 
 term('\n');
-term(`    API Automaton v${ver}`);
+term(`    Automaton v${ver}`);
 term('\n\n');
 term.move(4, 0);
 term.yellow(`Status: `).red('Offline');
