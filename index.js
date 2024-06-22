@@ -1,47 +1,66 @@
+
+const { Client, Events, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
+const term = require('terminal-kit').terminal;
+const fs = require('fs');
+const path = require('path');
+const commandsPath = path.join(__dirname, 'commands');
 const dot = require('dotenv');
 dot.config();
-const { Client, Events, GatewayIntentBits } = require('discord.js');
-const term = require('terminal-kit').terminal;
-const conf = require('./package.json');
-const ver = conf.version;
+const TOKEN = process.env.TOKEN;
+const package = require('./package.json');
+const { update } = require('firebase/database');
+const ver = package.version;
 
 // Utilities and Functions
 
 let client,
-    curClient,
     isRunning = false,
-    runningUpdater;
+    runningUpdater,
+    configExists = false,
+    commands;
 
 function rectifyConsole() {
     term.clear();
     term.hideCursor(false);
 }
 
+function hideMenu() {
+    term.eraseArea(1, 6, 50, 2);
+}
+
 function startBot() {
-    term.moveTo(4, 7);
+    hideMenu();
+    if (isRunning) {
+        updateInfo(true);
+        return;
+    };
+    term.moveTo(5, 6);
     try {
         client = new Client({ intents: [GatewayIntentBits.Guilds] });
-        client.once(Events.ClientReady, readyClient => {
-            curClient = readyClient;
+        client.once(Events.ClientReady, response => {
             isRunning = true;
             runningUpdater = setInterval(() => updateInfo(), 2500);
         });
-        client.login(process.env.TOKEN);
-        term.green('Bot Loaded Successfully! ');
-        setTimeout(() => { updateInfo(true) }, 1000);
+        client.login(TOKEN);
+        term.green('Bot Loaded Successfully');
+        setTimeout(() => { reloadBot(); }, 1000);
     } catch(e) {
-        term.red('Bot failed to start with error:').white(e);
+        term.moveTo(5, 12);
+        term(e);
+        term.red('Bot Loading Failed');
+        setTimeout(() => { updateInfo(true) }, 1000);
     }
 }
 
 function stopBot(end) {
+    hideMenu();
     if (isRunning) {
         client.destroy();
         isRunning = false;
         clearInterval(runningUpdater);
     }
     updateInfo();
-    term.moveTo(5, 7);
+    term.moveTo(5, 6);
     if (end) {
         term.green('Bot Destroyed and Shutting Down Process...');
         setTimeout(() => {
@@ -50,8 +69,47 @@ function stopBot(end) {
         }, 1000);
     } else {
         term.green('Bot Destroyed and Logged Out');
-        setTimeout(() => { updateInfo(true) }, 1000);
+        setTimeout(() => { updateInfo(true); }, 1000);
     }
+}
+
+async function reloadBot() {
+    hideMenu();
+    commands = new Collection();
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+	for (const file of commandFiles) {
+		const filePath = path.join(commandsPath, file);
+		const command = require(filePath);
+		if ('data' in command && 'execute' in command) {
+			commands.set(command.data.name, command);
+		}
+	}
+    client.on(Events.InteractionCreate, async interaction => {
+        if (!interaction.isChatInputCommand()) return;
+        const command = commands.get(interaction.commandName);
+        if (!command) return;
+        try { await command.execute(interaction); } catch(e) {
+            term.moveTo(5, 12);
+            term(e);
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+            } else {
+                await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+            }
+        }
+    });
+    const rest = new REST().setToken(TOKEN);
+    (async () => {
+        try {
+            const data = await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
+            term.moveTo(5, 6);
+            term.green('Bot Commands Reloaded');
+        } catch(e) {
+            term.moveTo(5, 12);
+            term(e);
+        }
+    })();
+    setTimeout(() => { updateInfo(true); }, 1000);
 }
 
 function formatTime(duration) {
@@ -67,12 +125,20 @@ function formatTime(duration) {
 
 // Preload, Events and Setup
 
+try { global.config = require('./config.json'); configExists = true; } catch(e) { configExists = false; }
+
 term.grabInput();
 term.on('key', (name, matches, data) => {
     if (name === 'CTRL_C') {
         rectifyConsole();
         process.exit(); 
     }
+});
+
+process.on('uncaughtException', (e) => { 
+    term.moveTo(5, 12);
+    term(e); 
+    resetMenu(); 
 });
 
 // Console Renderer and Functionality
@@ -82,35 +148,35 @@ term.clear();
 term('\n');
 term(`    Automaton v${ver}`);
 term('\n\n');
-term.move(4, 0);
-term.yellow(`Status: `).red('Offline');
 
-let items = ['Start', 'Stop', 'Reload Commands', 'Shutdown'];
+const runningItems = ['Stop', 'Reload Commands', 'Shutdown'];
+const stoppedItems = ['Start', 'Shutdown'];
 
 function resetMenu() {
     term.eraseArea(1, 6, 50, 2);
     term.hideCursor();
+    let items;
+    if (isRunning) items = runningItems;
+    else items = stoppedItems;
     term.singleLineMenu(items, { y: 6, selectedStyle: term.black.bgGreen }, (error, response) => {
         term.moveTo(5, 7);
-        switch (response.selectedIndex) {
-            case 0:
+        switch (response.selectedText) {
+            case 'Start':
                 startBot();
                 break;
-            case 1:
+            case 'Stop':
                 stopBot();
                 break;
-            case 2:
+            case 'Reload Commands':
                 reloadBot();
                 break;
-            case 3:
+            case 'Shutdown':
                 stopBot(true);
                 break;
             default: return;
         }
     });
 }
-
-resetMenu(); // Initialization / Start the interactive console
 
 function updateInfo(menu) {
     global.client = client; // Give access to the whole process
@@ -122,7 +188,11 @@ function updateInfo(menu) {
         if (ping <= 10) term.green(ping + "ms");
         else if (ping <= 30) term.yellow(ping + "ms");
         else term.red(ping + "ms");
-        term.yellow('  Bot Account: ').white(client.user.username).brightGreen("#" + client.user.discriminator);
+        term.yellow('  Bot Account: ').white(`"${client.user.username}`).brightGreen("#" + client.user.discriminator).white(`"`);
     } else term.yellow('Status: ').red('Offline');
     if (menu) resetMenu(); // Resetting the menu constantly would make it useless
 }
+
+// Start
+
+updateInfo(true);
