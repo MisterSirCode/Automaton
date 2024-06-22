@@ -1,4 +1,4 @@
-# Discord Automaton
+# Automaton
 A simple bot boilerplate + general utility bot
 
 Create a `.env` file and include your token in this format: `TOKEN=YourTokenHere`
