@@ -109,10 +109,11 @@ function resetMenu() {
     });
 }
 
-resetMenu();
+resetMenu(); // Initialization / Start the interactive console
 
 function updateInfo(menu) {
-    term.eraseArea(5, 4, 50, 1);
+    global.client = client; // Give access to the whole process
+    term.eraseArea(5, 4, 100, 1);
     term.moveTo(5, 4);
     if (isRunning) {
         term.yellow('Status: ').green('Online').yellow('  Uptime: ').white(formatTime(client.uptime)).yellow('  API Ping: ');
@@ -120,6 +121,7 @@ function updateInfo(menu) {
         if (ping <= 10) term.green(ping + "ms");
         else if (ping <= 30) term.yellow(ping + "ms");
         else term.red(ping + "ms");
+        term.yellow('  Bot Account: ').white(client.user.username).brightGreen("#" + client.user.discriminator);
     } else term.yellow('Status: ').red('Offline');
-    if (menu) resetMenu();
+    if (menu) resetMenu(); // Resetting the menu constantly would make it useless
 }
