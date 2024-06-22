@@ -1,6 +1,6 @@
 {
-  "name": "discord-api-automaton",
-  "version": "1.0.0",
+  "name": "automaton",
+  "version": "0.0.2",
   "description": "A simple bot boilerplate + general utility bot",
   "main": "index.js",
   "scripts": {

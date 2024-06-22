@@ -1,7 +1,7 @@
 # Automaton
 A simple bot boilerplate + general utility bot
 
-Open the `.env` file and include your token in this format: `TOKEN=YourTokenHere`
+Create a `.env` file and include your token in this format: `TOKEN=YourTokenHere`
 
 Use `run_unix.sh` or `run_win.bat` accordingly.
 

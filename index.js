@@ -1,8 +1,9 @@
-const ver = '0.0.1';
 const dot = require('dotenv');
 dot.config();
 const { Client, Events, GatewayIntentBits } = require('discord.js');
 const term = require('terminal-kit').terminal;
+const conf = require('./package.json');
+const ver = conf.version;
 
 // Utilities and Functions
 
