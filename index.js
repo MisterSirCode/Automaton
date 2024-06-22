@@ -8,7 +8,6 @@ const dot = require('dotenv');
 dot.config();
 const TOKEN = process.env.TOKEN;
 const package = require('./package.json');
-const { update } = require('firebase/database');
 const ver = package.version;
 
 // Utilities and Functions
@@ -45,7 +44,7 @@ function startBot() {
         term.green('Bot Loaded Successfully');
         setTimeout(() => { reloadBot(); }, 1000);
     } catch(e) {
-        term.moveTo(5, 12);
+        term.moveTo(1, 10);
         term(e);
         term.red('Bot Loading Failed');
         setTimeout(() => { updateInfo(true) }, 1000);
@@ -76,12 +75,14 @@ function stopBot(end) {
 async function reloadBot() {
     hideMenu();
     commands = new Collection();
+    let jsoncmds = [];
     const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 	for (const file of commandFiles) {
 		const filePath = path.join(commandsPath, file);
 		const command = require(filePath);
 		if ('data' in command && 'execute' in command) {
 			commands.set(command.data.name, command);
+            jsoncmds.push(command.data.toJSON());
 		}
 	}
     client.on(Events.InteractionCreate, async interaction => {
@@ -89,7 +90,7 @@ async function reloadBot() {
         const command = commands.get(interaction.commandName);
         if (!command) return;
         try { await command.execute(interaction); } catch(e) {
-            term.moveTo(5, 12);
+            term.moveTo(1, 10);
             term(e);
             if (interaction.replied || interaction.deferred) {
                 await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
@@ -101,26 +102,30 @@ async function reloadBot() {
     const rest = new REST().setToken(TOKEN);
     (async () => {
         try {
-            const data = await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
+            term.moveTo(1, 10);
+            const data = await rest.put(Routes.applicationGuildCommands(client.user.id, global.config.main_guild), { body: jsoncmds });
             term.moveTo(5, 6);
             term.green('Bot Commands Reloaded');
         } catch(e) {
-            term.moveTo(5, 12);
+            term.moveTo(1, 10);
             term(e);
         }
+        setTimeout(() => { updateInfo(true); }, 1000);
     })();
-    setTimeout(() => { updateInfo(true); }, 1000);
 }
 
 function formatTime(duration) {
     let milliseconds = Math.floor((duration % 1000) / 100),
         seconds = Math.floor((duration / 1000) % 60),
-        minutes = Math.floor((duration / (60000)) % 60),
-        hours = Math.floor((duration / (3600000)) % 24);
+        minutes = Math.floor((duration / 60000) % 60),
+        hours = Math.floor((duration / 3600000) % 24);
+        days = Math.floor((duration / 86400000) % 365);
+    let tdays = (days < 10) ? "0" + days : days;
+    days = (days < 365) ? "0" + tdays : tdays;
     hours = (hours < 10) ? "0" + hours : hours;
     minutes = (minutes < 10) ? "0" + minutes : minutes;
     seconds = (seconds < 10) ? "0" + seconds : seconds;
-    return hours + ":" + minutes + ":" + seconds + "." + milliseconds;
+    return days + ":" + hours + ":" + minutes + ":" + seconds + "." + milliseconds;
 }
 
 // Preload, Events and Setup
@@ -136,7 +141,7 @@ term.on('key', (name, matches, data) => {
 });
 
 process.on('uncaughtException', (e) => { 
-    term.moveTo(5, 12);
+    term.moveTo(1, 10);
     term(e); 
     resetMenu(); 
 });
