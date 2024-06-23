@@ -10,10 +10,11 @@ const TOKEN = process.env.TOKEN;
 const package = require('./package.json');
 const ver = package.version;
 
+global.version = ver;
+
 // Utilities and Functions
 
-let client,
-    isRunning = false,
+let isRunning = false,
     runningUpdater,
     configExists = false,
     commands;
@@ -35,12 +36,12 @@ function startBot() {
     };
     term.moveTo(5, 6);
     try {
-        client = new Client({ intents: [GatewayIntentBits.Guilds] });
-        client.once(Events.ClientReady, response => {
+        global.client = new Client({ intents: [GatewayIntentBits.Guilds] });
+        global.client.once(Events.ClientReady, response => {
             isRunning = true;
             runningUpdater = setInterval(() => updateInfo(), 2500);
         });
-        client.login(TOKEN);
+        global.client.login(TOKEN);
         term.green('Bot Loaded Successfully');
         setTimeout(() => { reloadBot(); }, 1000);
     } catch(e) {
@@ -54,7 +55,7 @@ function startBot() {
 function stopBot(end) {
     hideMenu();
     if (isRunning) {
-        client.destroy();
+        global.client.destroy();
         isRunning = false;
         clearInterval(runningUpdater);
     }
@@ -80,12 +81,18 @@ async function reloadBot() {
 	for (const file of commandFiles) {
 		const filePath = path.join(commandsPath, file);
 		const command = require(filePath);
+        try { delete require.cache[require.resolve(filePath)]; }
+        catch(e) { 
+            term.moveTo(1, 10);
+            term(e);
+        }
 		if ('data' in command && 'execute' in command) {
 			commands.set(command.data.name, command);
             jsoncmds.push(command.data.toJSON());
 		}
 	}
-    client.on(Events.InteractionCreate, async interaction => {
+    global.client.removeAllListeners();
+    global.client.on(Events.InteractionCreate, async interaction => {
         if (!interaction.isChatInputCommand()) return;
         const command = commands.get(interaction.commandName);
         if (!command) return;
@@ -184,16 +191,15 @@ function resetMenu() {
 }
 
 function updateInfo(menu) {
-    global.client = client; // Give access to the whole process
     term.eraseArea(5, 4, 100, 1);
     term.moveTo(5, 4);
     if (isRunning) {
         term.yellow('Status: ').green('Online').yellow('  Uptime: ').white(formatTime(client.uptime)).yellow('  API Ping: ');
-        let ping = client.ws.ping || 0;
+        let ping = global.client.ws.ping || 0;
         if (ping <= 10) term.green(ping + "ms");
         else if (ping <= 30) term.yellow(ping + "ms");
         else term.red(ping + "ms");
-        term.yellow('  Bot Account: ').white(`"${client.user.username}`).brightGreen("#" + client.user.discriminator).white(`"`);
+        term.yellow('  Bot Account: ').white(`"${client.user.username}`).brightGreen("#" + global.client.user.discriminator).white(`"`);
     } else term.yellow('Status: ').red('Offline');
     if (menu) resetMenu(); // Resetting the menu constantly would make it useless
 }
