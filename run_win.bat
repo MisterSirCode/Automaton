@@ -1,1 +1,1 @@
-node index.js & pause >nul
+node index.js & pause
