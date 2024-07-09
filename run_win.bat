@@ -1,1 +1,1 @@
-cmd /k node index.js
+cmd /k "node index.js"
