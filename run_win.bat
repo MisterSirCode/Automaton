@@ -1,1 +1,1 @@
-cmd /k "node index.js"
+node index.js & pause >nul
